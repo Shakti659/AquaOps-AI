@@ -172,6 +172,8 @@ Relevant Operational Context
               |
               v
 Operator Decision
+```
+
 
 # 7. Core Features
 
