@@ -1,12 +1,12 @@
 # AquaOps AI — Project Overview
 
-## 1. Project Name
+# 1. Project Name
 
 **AquaOps AI — Intelligent Water Operations & Incident Management Platform**
 
 ---
 
-## 2. Project Summary
+# 2. Project Summary
 
 AquaOps AI is a full-stack, event-driven water operations and incident management platform.
 
@@ -40,7 +40,7 @@ The project is designed as a portfolio and learning project covering:
 
 ---
 
-## 3. Business Problem
+# 3. Business Problem
 
 Water operations depend on continuous monitoring of operational conditions such as:
 
@@ -69,7 +69,7 @@ AquaOps AI addresses these needs through an event-driven architecture combined w
 
 ---
 
-## 4. Problem Statement
+# 4. Problem Statement
 
 The system should help water operations teams move from:
 
@@ -83,7 +83,7 @@ The platform should make operational information easier to observe, understand, 
 
 ---
 
-## 5. Target Users
+# 5. Target Users
 
 ### 5.1 Operations Operator
 
@@ -129,7 +129,7 @@ Typical responsibilities:
 
 ---
 
-## 6. Core Business Workflow
+# 6. Core Business Workflow
 
 The primary AquaOps workflow is:
 
@@ -173,9 +173,9 @@ Relevant Operational Context
               v
 Operator Decision
 
-## 7. Core Features
+# 7. Core Features
 
-##7.1 Authentication and Authorization
+## 7.1 Authentication and Authorization
 The platform will provide secure user authentication and role-based authorization.
 Planned concepts:
 - JWT
@@ -184,7 +184,7 @@ Planned concepts:
 - Secure password handling
 - Protected APIs
 
-##7.2 Sensor Management
+## 7.2 Sensor Management
 The system will maintain information about operational sensors.
 Examples:
 - Sensor identifier
@@ -194,7 +194,7 @@ Examples:
 - Measurement type
 - Configuration information
 
-7.3 Telemetry Processing
+## 7.3 Telemetry Processing
 The system will receive operational telemetry such as:
 - Flow
 - Pressure
@@ -203,7 +203,7 @@ The system will receive operational telemetry such as:
 - Temperature where applicable
 Telemetry will be processed asynchronously using an event-driven architecture.
 
-7.4 Anomaly Detection
+## 7.4 Anomaly Detection
 The platform will identify abnormal operational patterns.
 Examples:
 - Unexpected pressure increase
@@ -214,7 +214,7 @@ Examples:
 The initial implementation will use explainable rule/threshold-based detection.
 More advanced AI/ML approaches may be considered separately after the core system is stable.
 
-7.5 Incident Management
+## 7.5 Incident Management
 Detected operational anomalies can result in incidents.
 An incident may contain:
 - Incident ID
@@ -234,7 +234,7 @@ Possible incident statuses include:
 - RESOLVED
 - CLOSED
 
-7.6 Notifications
+## 7.6 Notifications
 The system will notify appropriate users when important incidents occur.
 Examples:
 - New critical incident
@@ -243,7 +243,7 @@ Examples:
 - Important operational event
 The notification mechanism may initially be implemented as an application-level notification and expanded later.
 
-7.7 Operations Dashboard
+## 7.7 Operations Dashboard
 The React frontend will provide an operational dashboard.
 The dashboard will allow users to view:
 - Active incidents
@@ -254,7 +254,7 @@ The dashboard will allow users to view:
 - Operational trends
 - Notifications
 
-7.8 AI Operations Assistant
+## 7.8 AI Operations Assistant
 AquaOps AI will include an AI assistant designed to help operators understand operational incidents.
 The assistant may answer questions such as:
 - What happened?
@@ -266,7 +266,7 @@ The assistant may answer questions such as:
 - What information should an operator review?
 The AI assistant should use relevant application data rather than relying only on general language-model knowledge.
 
-8. AI Strategy
+# 8. AI Strategy
 The AI component will use Spring AI and Retrieval-Augmented Generation (RAG) concepts.
 
 Operator Question
@@ -293,7 +293,7 @@ Operator
 The objective is to reduce unsupported answers by providing the AI model with relevant application context.
 
 
-9. AI Guardrails
+# 9. AI Guardrails
 The AI assistant is an operational support tool and should not be treated as an autonomous control system.
 The system should therefore consider:
 - Grounding responses in available operational data
@@ -308,7 +308,7 @@ The system should therefore consider:
 The AI should not directly execute dangerous or irreversible infrastructure actions.
 
 
-10. Technology Stack
+# 10. Technology Stack
 Backend
 Java
 Primary programming language for backend services.
@@ -479,7 +479,7 @@ Potential uses:
 - Retrieval
 - RAG workflows
 
-11. High-Level System Components
+# 11. High-Level System Components
 The planned application will contain a limited number of meaningful services.
 API Gateway
 Entry point for frontend requests.
@@ -522,7 +522,7 @@ Responsible for:
 - AI-specific safeguards
 
 
-12. Data Responsibility
+# 12. Data Responsibility
 The project intentionally uses different storage technologies for different types of data.
 
 PostgreSQL
@@ -550,7 +550,7 @@ Kafka
 The detailed database design will be documented later.
 
 
-13. Event-Driven Architecture
+# 13. Event-Driven Architecture
 AquaOps AI will use asynchronous events where they provide a meaningful architectural benefit.
 For example:
 
@@ -586,7 +586,7 @@ Kafka will not be introduced into every communication path.
 Simple request/response operations can continue to use REST APIs where appropriate.
 
 
-14. Project Scope
+# 14. Project Scope
 In Scope
 The initial project scope includes:
 - User authentication
@@ -613,7 +613,7 @@ The initial project scope includes:
 - Interview preparation
 
 
-15. Out of Scope
+# 15. Out of Scope
 The project will not initially attempt to implement:
 - Physical control of pumps or valves
 - Autonomous infrastructure control
@@ -627,7 +627,7 @@ These may be discussed as future extensions but are outside the initial implemen
 
 
 
-16. Learning Goals
+# 16. Learning Goals
 AquaOps AI is also a structured learning project.
 The project should develop understanding of:
 Java
@@ -704,7 +704,7 @@ AI Engineering
 - Human-in-the-loop design
 
 
-7. Portfolio Goals
+# 17. Portfolio Goals
 The project should demonstrate that the developer can:
 1. Understand a business problem.
 2. Translate requirements into software architecture.
@@ -722,7 +722,7 @@ The project should demonstrate that the developer can:
 14. Document engineering decisions.
 15. Troubleshoot real development problems.
 
-18. Engineering Principles
+# 18. Engineering Principles
 The project will follow these principles:
 Principle 1 — Business First
 Technology decisions should solve actual system requirements.
@@ -742,7 +742,7 @@ Principle 8 — Learn While Building
 Every major implementation should be accompanied by an explanation of the underlying engineering concept.
 
 
-19. Success Criteria
+# 19. Success Criteria
 AquaOps AI will be considered successful when the project can demonstrate an end-to-end flow similar to:
 Sensor Telemetry
        |
@@ -786,7 +786,7 @@ The project should also demonstrate:
 - Clear technical documentation
 
 
-20. Future Extensions
+# 20. Future Extensions
 Potential future extensions include:
 - Advanced anomaly detection
 - Time-series analytics
@@ -801,7 +801,7 @@ Potential future extensions include:
 - More sophisticated incident correlation
 These are intentionally deferred until the core system is stable.
 
-21. Project Development Philosophy
+# 21. Project Development Philosophy
 AquaOps AI will be developed incrementally.
 The development sequence will follow:
 
@@ -825,7 +825,7 @@ Improve
 Each major stage should have a checkpoint before moving to the next stage.
 
 
-## 22. Current Project Status
+# 22. Current Project Status
 Completed
 - Development environment preparation
 - Git repository initialization
