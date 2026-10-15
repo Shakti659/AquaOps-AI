@@ -134,3 +134,127 @@ flowchart TB
 - Redis is a rebuildable cache; PostgreSQL remains authoritative for incidents.
 - The telemetry storage design will be evaluated against retention, query, volume, and resource requirements before implementation.
 - AI retrieves context through controlled interfaces and does not directly change incident status or independently declare a sensor reading abnormal.
+
+## 8. Component Responsibilities and Boundaries
+
+### 8.1 API Gateway
+
+**Primary responsibility:** Provide a common entry point for frontend API requests.
+
+Responsibilities:
+- Route incoming requests to the appropriate backend service.
+- Apply shared request-handling policies where appropriate.
+- Support centralized rate limiting and request filtering as these capabilities are introduced.
+- Propagate authenticated identity and request correlation information securely.
+
+Boundaries:
+- Does not own business entities such as users, sensors, or incidents.
+- Does not replace authorization checks inside backend services.
+- Does not perform anomaly detection or AI reasoning.
+
+### 8.2 User Service
+
+**Primary responsibility:** Manage user-related business data and access-related operations.
+
+Responsibilities:
+- Maintain user profiles and account status.
+- Manage application roles and role assignments.
+- Support user-management operations for authorized administrators.
+- Integrate with the chosen authentication design.
+
+Data ownership:
+- User profiles, role assignments, and account status will be stored in PostgreSQL.
+
+Boundaries:
+- Does not own sensor telemetry or incident lifecycle data.
+- Authentication, token issuance, and token validation responsibilities will be finalized in the security design.
+
+### 8.3 Sensor Service
+
+**Primary responsibility:** Manage sensor metadata and accept telemetry measurements.
+
+Responsibilities:
+- Register and update sensor metadata.
+- Validate incoming telemetry structure, timestamps, and measurement values.
+- Associate measurements with known sensors.
+- Publish telemetry events to Kafka for downstream processing.
+- Expose authorized sensor information to the dashboard and AI Service.
+
+Data ownership:
+- Sensor metadata will be stored in PostgreSQL.
+- MongoDB is the current candidate for selected telemetry documents, subject to validation of query patterns, retention, and resource requirements.
+
+Boundaries:
+- Does not own the incident lifecycle.
+- Does not rely on an LLM to decide whether measurements violate configured thresholds.
+- Must not publish invalid or unauthenticated device data as trusted telemetry.
+
+### 8.4 Incident Service
+
+**Primary responsibility:** Own incident creation and lifecycle management.
+
+Responsibilities:
+- Process anomaly results and create incidents according to deterministic business rules.
+- Maintain incident severity, status, assignment, and resolution information.
+- Enforce valid incident state transitions.
+- Provide APIs for retrieving and updating incidents.
+- Publish incident events for downstream consumers.
+- Provide authorized incident context to the AI Service.
+
+Data ownership:
+- PostgreSQL is the authoritative store for incident records.
+- Redis may cache selected frequently accessed data, but cached data can be rebuilt from authoritative sources.
+
+Boundaries:
+- Does not send emails directly.
+- Does not delegate authoritative incident-state changes to the AI Service.
+- Must account for duplicate events and repeated processing.
+
+### 8.5 Notification Service
+
+**Primary responsibility:** Deliver notifications triggered by relevant business events.
+
+Responsibilities:
+- Consume configured notification events from Kafka.
+- Apply notification preferences and delivery policies.
+- Send notifications through the selected delivery provider.
+- Track delivery attempts and outcomes.
+- Retry transient failures and route exhausted failures for investigation.
+
+Data ownership:
+- Notification delivery records and outcomes will be stored in PostgreSQL, subject to the final data model.
+
+Boundaries:
+- Does not own incident status.
+- A notification failure must not reverse an already committed incident.
+- Consumers must handle duplicate event delivery safely.
+
+### 8.6 AI Service
+
+**Primary responsibility:** Provide contextual explanations and investigation assistance.
+
+Responsibilities:
+- Authenticate and authorize AI requests.
+- Retrieve relevant incident, sensor, and telemetry context through controlled interfaces.
+- Construct prompts using relevant evidence.
+- Invoke the configured LLM provider through Spring AI.
+- Return explanations that distinguish known facts from possible causes.
+- Handle provider timeouts, errors, and unavailable context gracefully.
+
+Boundaries:
+- Does not independently classify raw telemetry as abnormal.
+- Does not directly write to incident records or change incident status.
+- Must not disclose information the requesting user is not authorized to access.
+- Must communicate uncertainty and avoid presenting unsupported claims as facts.
+
+### 8.7 Data Ownership Principle
+
+Each business service is responsible for the integrity of its own authoritative data.
+
+Other services should access business information through documented APIs or published events rather than directly modifying another service's database tables.
+
+The use of a shared database server during local development does not imply shared ownership of tables. Logical ownership and access boundaries must remain explicit.
+
+### 8.8 Component Evolution
+
+These responsibilities describe the initial design. If implementation reveals that a responsibility is too broad or that a new component is justified, the architecture will be updated through a documented decision rather than splitting services prematurely.
