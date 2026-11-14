@@ -258,3 +258,129 @@ The use of a shared database server during local development does not imply shar
 ### 8.8 Component Evolution
 
 These responsibilities describe the initial design. If implementation reveals that a responsibility is too broad or that a new component is justified, the architecture will be updated through a documented decision rather than splitting services prematurely.
+
+## 9. Communication Patterns and Failure Handling
+
+### 9.1 Synchronous Communication Using REST APIs
+
+HTTP REST APIs will be used when a caller requires an immediate response.
+
+Planned use cases include:
+- User authentication and user-management operations.
+- Sensor registration and sensor metadata retrieval.
+- Incident retrieval and lifecycle updates.
+- Dashboard data retrieval.
+- AI assistant requests.
+
+REST requests will use documented API contracts, appropriate HTTP methods, validation, authentication, and authorization.
+
+The API Gateway will route frontend requests to the appropriate backend service.
+
+### 9.2 Asynchronous Communication Using Apache Kafka
+
+Apache Kafka will be used for selected event-driven workflows that do not require the producer to wait for downstream processing.
+
+Planned events include:
+- TelemetryReceived.
+- AnomalyDetected.
+- IncidentCreated.
+- IncidentUpdated.
+- NotificationRequested.
+
+Kafka producers and consumers will communicate through explicitly defined topics and event schemas.
+
+Consumers must be designed to handle retries, duplicate delivery, and temporary unavailability.
+
+### 9.3 REST and Kafka Selection Guidelines
+
+REST will be preferred when:
+- The caller needs an immediate response.
+- A user is retrieving or updating a resource.
+- The operation requires request validation and a direct result.
+
+Kafka will be preferred when:
+- A business event needs to be consumed independently by multiple components.
+- Background processing is appropriate.
+- The producer should not wait for downstream processing.
+- Event retention and independent consumer processing are useful.
+
+The choice will be based on business requirements rather than using both technologies unnecessarily.
+
+### 9.4 Kafka Availability Failure
+
+If Kafka is temporarily unavailable, event publishing must not be reported as successful unless the event has been durably accepted.
+
+The system will evaluate a Transactional Outbox Pattern for reliable event publishing.
+
+The outbox approach will store the business transaction and its outgoing event record in the same database transaction. A separate publisher will forward pending events to Kafka.
+
+Publishing failures will be logged, monitored, and retried according to a controlled policy.
+
+### 9.5 Duplicate Event Handling and Idempotency
+
+Kafka consumers must tolerate duplicate event delivery.
+
+Events will include a unique event identifier so consumers can identify previously processed events.
+
+Where processing causes a business side effect, the consumer will use an idempotency mechanism, such as a processed-event record or a unique database constraint.
+
+The design must ensure that duplicate processing does not create duplicate incidents or unintended repeated notifications.
+
+### 9.6 Notification Delivery Failure
+
+Notification delivery is independent of incident creation.
+
+If a notification provider is temporarily unavailable:
+- The delivery attempt and failure will be recorded.
+- Transient failures will be retried using controlled backoff.
+- Maximum retry attempts will be configured.
+- Exhausted failures will be routed to a dead-letter mechanism for investigation.
+- Delivery status will be observable.
+
+A notification failure must not roll back or reverse an incident that has already been committed.
+
+### 9.7 Redis Cache Failure
+
+Redis will be treated as a non-authoritative cache.
+
+If Redis is unavailable, the Incident Service should attempt to retrieve authoritative incident data from PostgreSQL.
+
+Cache failures will be logged and monitored. The application must not treat missing cache entries as proof that an incident does not exist.
+
+### 9.8 AI Provider Failure
+
+The AI Service will use bounded request timeouts when communicating with external LLM providers.
+
+If the provider is unavailable or returns an error:
+- The service will return a clear temporary-unavailability response.
+- It will not fabricate an explanation.
+- The failure will be logged with request correlation information.
+- Normal incident retrieval and management will remain available independently of AI.
+
+AI assistance is optional to the core incident-management workflow.
+
+### 9.9 Security and Authorization Failure
+
+Authentication and authorization will be enforced by backend components.
+
+The API Gateway may perform shared token validation and request filtering, but business services must enforce authorization for operations and data they own.
+
+Unauthorized requests must be rejected. Sensitive data must not be exposed through API responses, logs, events, or AI context retrieval.
+
+### 9.10 Observability and Recovery
+
+The system will progressively introduce:
+- Structured application logs.
+- Request and event correlation identifiers.
+- Service health checks.
+- Metrics for request failures, event processing, and notification delivery.
+- Monitoring for Kafka consumer lag and retry activity.
+- Alerts for persistent failures.
+
+Recovery procedures and operational thresholds will be defined during implementation and deployment.
+
+### 9.11 Failure Handling Principle
+
+Failure in an optional downstream capability must not unnecessarily disable core incident-management functionality.
+
+The system will prioritize durable business records, controlled retries, observable failures, and safe degradation over silently losing data or reporting false success.
