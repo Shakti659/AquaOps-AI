@@ -976,3 +976,310 @@ These enhancements will be evaluated according to project requirements and deplo
 Status: Initial security architecture documented.
 
 Implementation of authentication, JWT validation, RBAC, sensor authentication, and service-to-service security will be completed during backend development.
+
+## 13. Architecture Trade-offs and Technology Decisions
+
+### 13.1 Purpose
+
+This section documents the reasoning behind major architectural and technology choices in AquaOps AI.
+
+Technology selection must consider functional requirements, operational complexity, scalability, reliability, maintainability, development effort, and project objectives.
+
+No technology is considered universally superior. Each selection involves benefits, limitations, and trade-offs.
+
+### 13.2 Microservices vs Monolithic Architecture
+
+**Decision:** Use a small, domain-oriented microservices architecture.
+
+**Context:**
+
+AquaOps AI contains several business responsibilities, including user management, sensor telemetry, incident management, notification delivery, and AI-assisted investigation.
+
+These responsibilities have different workflows and operational requirements.
+
+**Alternatives considered:**
+
+1. Monolithic application.
+2. Modular monolith.
+3. Microservices architecture.
+
+**Rationale:**
+
+Microservices allow the main business responsibilities to be developed and deployed independently.
+
+They also provide practical experience with:
+
+- Service boundaries.
+- Independent deployment.
+- Distributed communication.
+- Event-driven architecture.
+- Failure isolation.
+- Service-level observability.
+
+**Consequences and trade-offs:**
+
+Benefits:
+- Independent service development and deployment.
+- Clearer business responsibility boundaries.
+- Independent scaling where necessary.
+- Better demonstration of distributed-system concepts.
+
+Costs:
+- More infrastructure and configuration.
+- Network communication failures.
+- Distributed data consistency challenges.
+- More complicated debugging and testing.
+- Increased deployment and monitoring effort.
+
+**Scope control:**
+
+The architecture will contain five business services and one API Gateway.
+
+Small responsibilities will remain inside the appropriate business service unless there is a clear technical or business reason to extract them.
+
+A modular monolith would be a reasonable alternative for a smaller production application. Microservices are selected here because of the project's learning objectives and the need to demonstrate distributed-system design.
+
+### 13.3 REST vs Kafka
+
+**Decision:** Use REST for synchronous request/response communication and Kafka for asynchronous event distribution.
+
+**Context:**
+
+Different workflows require different communication patterns.
+
+For example, the frontend needs immediate responses when requesting incident information, while telemetry and incident events may need to be processed by multiple independent consumers.
+
+**Alternatives considered:**
+
+1. REST-only communication.
+2. Kafka-only communication.
+3. Combined REST and event-driven communication.
+4. Other messaging systems such as RabbitMQ.
+
+**Rationale:**
+
+REST is appropriate for:
+- User login and API requests.
+- Retrieving incident information.
+- Sensor registration.
+- Operator actions.
+- Immediate request/response workflows.
+
+Kafka is appropriate for:
+- Telemetry event distribution.
+- Incident-created events.
+- Notification processing.
+- Asynchronous integration between services.
+- Independent event consumers.
+
+**Consequences and trade-offs:**
+
+REST provides straightforward request/response behavior but can introduce runtime dependencies between communicating services.
+
+Kafka reduces direct runtime coupling between event producers and consumers but introduces broker operations, consumer management, duplicate processing, and eventual consistency.
+
+Kafka consumers must be designed to handle duplicate event delivery through idempotent processing.
+
+Reliable event publishing may use the Transactional Outbox Pattern where required.
+
+Kafka will not replace REST for ordinary API operations.
+
+### 13.4 PostgreSQL vs MongoDB
+
+**Decision:** PostgreSQL is the authoritative relational database. MongoDB remains a candidate for selected telemetry documents.
+
+**Context:**
+
+AquaOps AI stores transactional business records and sensor telemetry.
+
+These data categories have different structures and access patterns.
+
+**Alternatives considered:**
+
+1. PostgreSQL only.
+2. MongoDB only.
+3. PostgreSQL and MongoDB together.
+4. PostgreSQL with a suitable time-series extension or other specialized storage, if justified later.
+
+**Rationale:**
+
+PostgreSQL is selected for authoritative business data because it provides relational integrity, transactions, constraints, and SQL capabilities.
+
+Examples:
+- Users and roles.
+- Sensor metadata.
+- Incidents and assignments.
+- Notification records.
+- Audit records.
+
+MongoDB may be suitable for selected telemetry documents where flexible document structures and document-oriented queries provide a meaningful advantage.
+
+**Consequences and trade-offs:**
+
+PostgreSQL provides a strong transactional foundation but may require deliberate schema and indexing decisions as telemetry volume grows.
+
+MongoDB provides flexible document storage but introduces another database to deploy, secure, monitor, back up, and maintain.
+
+Using two databases also increases operational and data consistency complexity.
+
+**Validation requirement:**
+
+MongoDB will not be treated as mandatory until the telemetry access patterns, volume, indexing requirements, retention strategy, and operational costs have been evaluated.
+
+PostgreSQL alone remains a valid initial implementation if it satisfies the project requirements.
+
+### 13.5 Redis vs Direct Database Access
+
+**Decision:** Use Redis as an optional, rebuildable cache.
+
+**Context:**
+
+Frequently requested data may be read repeatedly, increasing load on PostgreSQL.
+
+**Alternatives considered:**
+
+1. Direct PostgreSQL access for every request.
+2. Redis caching.
+3. Application-level in-memory caching.
+
+**Rationale:**
+
+Redis can reduce repeated database reads for frequently accessed information.
+
+The initial caching strategy will use the cache-aside pattern:
+
+1. Application checks Redis.
+2. If the key exists, the cached value is returned.
+3. If the key does not exist, the application reads PostgreSQL.
+4. The application places the retrieved value into Redis.
+5. Subsequent requests may use the cached value.
+
+**Consequences and trade-offs:**
+
+Benefits:
+- Faster repeated reads.
+- Reduced database load.
+- Configurable expiration through TTL.
+
+Costs:
+- Cache invalidation complexity.
+- Potentially stale values.
+- Additional infrastructure.
+- Memory usage and operational overhead.
+
+PostgreSQL remains the authoritative source of business data.
+
+Redis failure must not result in loss of authoritative records. Supported reads should fall back to PostgreSQL.
+
+### 13.6 Deterministic Anomaly Detection vs AI-Based Detection
+
+**Decision:** Use deterministic anomaly rules for the initial incident-detection workflow and AI for advisory investigation.
+
+**Context:**
+
+Water operations require predictable incident creation and traceable detection logic.
+
+An AI model may produce variable responses and can become unavailable because of external provider or network failures.
+
+**Alternatives considered:**
+
+1. Rule-based anomaly detection.
+2. AI-only anomaly detection.
+3. Combined deterministic detection and AI-assisted investigation.
+
+**Rationale:**
+
+Deterministic rules provide:
+- Predictable thresholds.
+- Repeatable test cases.
+- Explainable detection conditions.
+- Auditable incident creation.
+
+AI provides:
+- Natural-language incident explanations.
+- Contextual summaries.
+- Suggested investigation steps.
+- Assistance in understanding operational patterns.
+
+**Consequences and trade-offs:**
+
+Rule-based detection may require manual threshold configuration and may not recognize every complex pattern.
+
+AI may provide useful explanations but can produce incorrect or unsupported responses.
+
+Therefore:
+
+- Deterministic logic remains responsible for initial anomaly detection.
+- Incident Service remains responsible for authoritative incident lifecycle operations.
+- AI provides advisory assistance.
+- AI must not directly create, resolve, or change authoritative incident status without an explicitly designed and authorized workflow.
+
+### 13.7 API Gateway vs Direct Service Exposure
+
+**Decision:** Use an API Gateway as the primary entry point for frontend API traffic.
+
+**Context:**
+
+The frontend should not need to manage the internal network locations and routing details of individual backend services.
+
+**Alternatives considered:**
+
+1. Frontend directly communicates with every service.
+2. Central API Gateway.
+3. Gateway combined with service-level authorization.
+
+**Rationale:**
+
+The gateway provides a centralized entry point for routing, token validation, and selected cross-cutting controls.
+
+Backend services continue to own their business authorization and validation.
+
+**Consequences and trade-offs:**
+
+Benefits:
+- Simplified frontend integration.
+- Centralized routing.
+- Consistent gateway-level security controls.
+
+Costs:
+- Additional infrastructure.
+- Potential bottleneck if poorly configured.
+- Gateway availability becomes important.
+- Gateway configuration requires careful maintenance.
+
+The gateway must not become the sole security boundary.
+
+### 13.8 Architecture Decision Summary
+
+| Decision | Selected approach | Important trade-off |
+|---|---|---|
+| Application architecture | Small microservices architecture | Distributed-system complexity |
+| Frontend communication | REST through API Gateway | Gateway dependency |
+| Asynchronous communication | Kafka | Broker and consumer operations |
+| Transactional storage | PostgreSQL | Schema and query design |
+| Telemetry storage | MongoDB candidate | Additional database overhead |
+| Caching | Redis | Cache invalidation and staleness |
+| Anomaly detection | Deterministic rules | Threshold maintenance |
+| AI assistance | Advisory AI with authorized context | Model variability and provider dependency |
+| User security | JWT and RBAC | Token lifecycle and authorization complexity |
+
+### 13.9 Decision Review Principles
+
+Architecture decisions must be reviewed when:
+
+- Business requirements change.
+- Performance testing reveals limitations.
+- Infrastructure costs become significant.
+- A technology introduces unnecessary operational complexity.
+- Security requirements change.
+- An alternative provides a measurable improvement.
+
+Technology choices must be justified by requirements and evidence rather than popularity.
+
+### 13.10 Architecture Status
+
+Status: Initial architecture trade-offs documented.
+
+The detailed decisions are recorded in the Architecture Decision Records under `docs/decisions/`.
+
+Some decisions, particularly the need for MongoDB and the exact caching strategy, remain subject to implementation and workload validation.
