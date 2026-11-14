@@ -528,3 +528,207 @@ Using multiple data technologies introduces additional operational and developme
 AquaOps AI will use PostgreSQL, MongoDB, Redis, and Kafka only where their capabilities justify that complexity.
 
 The final implementation will validate resource consumption, performance, maintainability, and reliability before treating the initial choices as permanent.
+
+## 11. End-to-End Business Data Flows
+
+### 11.1 Telemetry-to-Incident Workflow
+
+This workflow describes how a sensor measurement can result in an operational incident.
+
+#### Step 1: Telemetry Submission
+
+A registered water sensor submits a measurement to the Sensor Service.
+
+Example:
+
+```json
+{
+  "sensorId": "PRESSURE-101",
+  "timestamp": "2026-10-07T10:30:00Z",
+  "metric": "PRESSURE",
+  "value": 7.8,
+  "unit": "bar"
+}
+```
+
+The example value and timestamp are illustrative.
+
+#### Step 2: Telemetry Validation
+
+The Sensor Service validates:
+- Sensor identity and registration.
+- Required fields.
+- Measurement type and unit.
+- Timestamp validity.
+- Measurement format and acceptable data constraints.
+
+Invalid or unauthenticated measurements must not be treated as trusted telemetry.
+
+#### Step 3: Telemetry Persistence
+
+Accepted telemetry is stored according to the selected telemetry storage strategy.
+
+MongoDB is the current candidate for selected telemetry documents, subject to workload and retention validation.
+
+#### Step 4: Telemetry Event Publication
+
+The Sensor Service publishes a TelemetryReceived event to Kafka.
+
+The event contains the information required by downstream consumers and includes a unique event identifier.
+
+#### Step 5: Anomaly Evaluation
+
+A deterministic anomaly-processing component evaluates the measurement against configured thresholds and business rules.
+
+The initial implementation will use explicit rules rather than an LLM to decide whether a measurement is abnormal.
+
+#### Step 6: Incident Creation
+
+When a configured rule identifies an actionable anomaly, the Incident Service creates an incident in PostgreSQL.
+
+The incident includes relevant sensor information, measurement evidence, severity, and creation time.
+
+Incident creation must account for duplicate event processing and existing active incidents according to the defined business rules.
+
+#### Step 7: Incident Event Publication
+
+After the incident is committed, an IncidentCreated event is published to Kafka.
+
+Reliable publication will be implemented using an appropriate mechanism, with the Transactional Outbox Pattern evaluated for this workflow.
+
+#### Step 8: Notification Processing
+
+The Notification Service consumes the incident event and initiates the configured notification process.
+
+Delivery attempts and outcomes are recorded independently of incident creation.
+
+#### Step 9: Dashboard Retrieval
+
+The React dashboard requests incident information through the API Gateway.
+
+The Incident Service retrieves authoritative data from PostgreSQL, optionally using Redis for eligible cached information.
+
+#### Step 10: Operator Investigation
+
+The operator opens the incident and may request an AI-generated explanation.
+
+The AI Service retrieves authorized evidence and generates a contextual response.
+
+### 11.2 Telemetry-to-Incident Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant S as Water Sensor
+    participant SS as Sensor Service
+    participant M as MongoDB
+    participant K as Kafka
+    participant AP as Anomaly Processor
+    participant IS as Incident Service
+    participant P as PostgreSQL
+    participant NS as Notification Service
+
+    S->>SS: Submit telemetry
+    SS->>SS: Validate sensor and measurement
+    SS->>M: Store accepted telemetry
+    SS->>K: Publish TelemetryReceived
+    K-->>AP: Deliver telemetry event
+    AP->>AP: Evaluate configured rules
+
+    alt Actionable anomaly detected
+        AP->>IS: Submit anomaly result
+        IS->>P: Create incident
+        P-->>IS: Commit successful
+        IS->>K: Publish IncidentCreated
+        K-->>NS: Deliver incident event
+        NS->>NS: Process notification
+    else No actionable anomaly
+        AP->>AP: Record normal processing outcome
+    end
+```
+
+### 11.3 Operator-to-AI Investigation Workflow
+
+This workflow describes how an authorized operator requests an explanation of an existing incident.
+
+#### Step 1: Operator Request
+
+The operator selects an incident in the React dashboard and submits a question.
+
+Example:
+
+"Why was INC-1001 classified as critical?"
+
+#### Step 2: API Gateway
+
+The API Gateway routes the request to the AI Service after applying the configured edge-level security controls.
+
+#### Step 3: Authorization
+
+The AI Service validates the requesting identity and checks whether the operator is authorized to access the requested information.
+
+#### Step 4: Context Retrieval
+
+The AI Service retrieves relevant incident, sensor, and telemetry information through controlled interfaces.
+
+Only information the requesting user is permitted to access may be included in the AI context.
+
+#### Step 5: Context Preparation
+
+The AI Service prepares a structured context containing verified information, relevant measurement history, and the operator's question.
+
+#### Step 6: LLM Invocation
+
+Spring AI is used to communicate with the configured LLM provider.
+
+#### Step 7: Response Validation
+
+The service evaluates the response for appropriate structure and presentation.
+
+The response must distinguish available evidence from possible explanations and acknowledge missing information or uncertainty.
+
+#### Step 8: Response Delivery
+
+The AI Service returns the explanation through the API Gateway to the React dashboard.
+
+The AI response is advisory and does not directly modify authoritative incident records.
+
+### 11.4 Operator-to-AI Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor O as Operator
+    participant UI as React Dashboard
+    participant G as API Gateway
+    participant AI as AI Service
+    participant IS as Incident Service
+    participant SS as Sensor Service
+    participant LLM as LLM Provider
+
+    O->>UI: Ask incident question
+    UI->>G: Submit AI request
+    G->>AI: Forward authenticated request
+    AI->>AI: Authorize access
+    AI->>IS: Retrieve incident context
+    IS-->>AI: Return authorized incident data
+    AI->>SS: Retrieve sensor context
+    SS-->>AI: Return authorized sensor data
+    AI->>AI: Prepare grounded context
+    AI->>LLM: Submit prompt and context
+    LLM-->>AI: Return generated explanation
+    AI->>AI: Validate and format response
+    AI-->>G: Return explanation
+    G-->>UI: Deliver response
+    UI-->>O: Display explanation
+```
+
+### 11.5 Business Flow Guarantees
+
+The implementation should preserve these principles:
+
+1. Invalid telemetry must not become trusted operational evidence.
+2. Incident records must be committed before downstream notification processing is considered successful.
+3. Duplicate events must not create unintended duplicate incidents or notifications.
+4. Notification failure must not reverse an existing incident.
+5. AI provider failure must not prevent normal incident retrieval and management.
+6. AI explanations must be based on authorized context and must not be treated as authoritative operational decisions.
+7. Each workflow must expose enough logging and correlation information for investigation.
