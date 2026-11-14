@@ -384,3 +384,147 @@ Recovery procedures and operational thresholds will be defined during implementa
 Failure in an optional downstream capability must not unnecessarily disable core incident-management functionality.
 
 The system will prioritize durable business records, controlled retries, observable failures, and safe degradation over silently losing data or reporting false success.
+
+## 10. Data Ownership and Database Architecture
+
+### 10.1 Data Ownership Principle
+
+Each business service will own and maintain the authoritative data associated with its responsibility.
+
+Other services must not directly modify another service's database tables or collections.
+
+Services will exchange information through documented APIs and published events.
+
+During local development, multiple services may use the same PostgreSQL server instance, but logical data ownership and access boundaries must remain explicit.
+
+### 10.2 PostgreSQL — Transactional Business Data
+
+PostgreSQL will be used for structured transactional business information.
+
+Planned data includes:
+- User profiles and account information.
+- Roles and role assignments.
+- Sensor metadata and registration information.
+- Incident records and lifecycle information.
+- Incident assignments and resolution details.
+- Notification delivery records.
+- Audit information.
+
+Reasons for selecting PostgreSQL:
+- Relational data modeling.
+- Transaction support.
+- Referential integrity and constraints.
+- Structured queries and indexing.
+- Reliable storage of business records.
+
+PostgreSQL will remain the authoritative source for incident information even when Redis is used as a cache.
+
+### 10.3 MongoDB — Telemetry Document Storage
+
+MongoDB is the current candidate for selected telemetry measurements.
+
+A telemetry document may contain:
+- Sensor identifier.
+- Measurement timestamp.
+- Measurement type.
+- Metric values.
+- Measurement unit.
+- Quality or validation information.
+
+A flexible document structure may be useful when different sensor types produce different measurement attributes.
+
+The final choice will be evaluated using:
+- Expected telemetry volume.
+- Query and aggregation patterns.
+- Retention requirements.
+- Indexing requirements.
+- Storage and memory requirements.
+- Operational complexity.
+
+MongoDB will not automatically become the storage solution for every type of telemetry. The decision will be validated against the actual workload and compared with PostgreSQL alternatives.
+
+### 10.4 Redis — Cache and Temporary State
+
+Redis will be used for selected frequently accessed data where caching provides a measurable performance benefit.
+
+Potential use cases include:
+- Frequently accessed active incident summaries.
+- Dashboard summary information.
+- Short-lived application data.
+
+The cache will use an explicit expiration and invalidation strategy.
+
+Redis will not be treated as the authoritative store for incidents or other transactional business records.
+
+If Redis becomes unavailable, the application should be able to retrieve authoritative information from PostgreSQL where practical.
+
+### 10.5 Apache Kafka — Event Streaming
+
+Kafka will transport asynchronous business events between independent components.
+
+Potential events include:
+- TelemetryReceived.
+- AnomalyDetected.
+- IncidentCreated.
+- IncidentUpdated.
+- NotificationRequested.
+
+Kafka will provide event retention and independent consumer processing according to configured topic and retention policies.
+
+Kafka will not replace PostgreSQL or MongoDB as the authoritative storage for business records or telemetry queries.
+
+### 10.6 Database Ownership Matrix
+
+| Service or Component | Data | Authoritative Storage |
+|---|---|---|
+| User Service | Users and roles | PostgreSQL |
+| Sensor Service | Sensor metadata | PostgreSQL |
+| Sensor Service | Selected telemetry documents | MongoDB, subject to validation |
+| Incident Service | Incidents and assignments | PostgreSQL |
+| Notification Service | Notification delivery records | PostgreSQL |
+| Incident Service | Cached incident information | Redis, non-authoritative |
+| Event producers and consumers | Published events | Kafka event topics |
+
+### 10.7 Data Consistency
+
+Each service will maintain transactional consistency within the data it owns.
+
+Cross-service workflows will use asynchronous events where immediate distributed transactions are unnecessary.
+
+This means some information may become visible to downstream services after a short delay. This behavior is known as eventual consistency.
+
+Consumers must handle duplicate events and failures without creating unintended business side effects.
+
+### 10.8 Data Retention and Lifecycle
+
+Data retention policies will be defined according to business, operational, and storage requirements.
+
+The implementation will consider:
+- Telemetry retention and archival.
+- Incident history retention.
+- Notification delivery history.
+- Kafka topic retention.
+- Cache expiration.
+- Backup and recovery requirements.
+
+Retention periods and deletion policies will be finalized before production deployment.
+
+### 10.9 Database Design Principles
+
+The database design will follow these principles:
+
+1. Each service owns its authoritative business data.
+2. Database constraints will protect important business invariants.
+3. Indexes will support actual query patterns.
+4. Sensitive information will be protected.
+5. Database migrations will be version-controlled.
+6. Cache data must be rebuildable from authoritative sources.
+7. Storage technology choices must be justified by actual requirements.
+
+### 10.10 Architectural Trade-offs
+
+Using multiple data technologies introduces additional operational and development complexity.
+
+AquaOps AI will use PostgreSQL, MongoDB, Redis, and Kafka only where their capabilities justify that complexity.
+
+The final implementation will validate resource consumption, performance, maintainability, and reliability before treating the initial choices as permanent.
