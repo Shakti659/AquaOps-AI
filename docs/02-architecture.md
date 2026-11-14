@@ -732,3 +732,247 @@ The implementation should preserve these principles:
 5. AI provider failure must not prevent normal incident retrieval and management.
 6. AI explanations must be based on authorized context and must not be treated as authoritative operational decisions.
 7. Each workflow must expose enough logging and correlation information for investigation.
+
+## 12. Security Architecture
+
+### 12.1 Purpose
+
+The purpose of the security architecture is to protect AquaOps AI users, sensors, services, business data, and AI capabilities from unauthorized access, misuse, and data exposure.
+
+Security must be enforced across the complete application rather than relying only on frontend restrictions or API Gateway validation.
+
+### 12.2 Security Principles
+
+The system follows these security principles:
+
+- Least Privilege: Every user and service receives only the permissions required for its responsibilities.
+- Defense in Depth: Security controls are implemented at multiple layers.
+- Secure by Default: Protected resources require authentication and authorization.
+- Backend Enforcement: Business permissions are enforced by backend services.
+- Secret Protection: Passwords, tokens, API keys, and credentials must not be exposed in source code or logs.
+- Data Minimization: Components should access only the data required to perform their responsibilities.
+- Auditability: Important security-sensitive operations should be recorded for investigation.
+
+### 12.3 User Authentication
+
+AquaOps AI uses email and password authentication for its initial user login workflow.
+
+The User Service is responsible for:
+
+- Validating user credentials.
+- Retrieving the corresponding user account.
+- Verifying the submitted password against its stored password hash.
+- Issuing a signed JWT access token after successful authentication.
+- Rejecting invalid credentials.
+- Applying account-related security rules.
+
+Plain-text passwords must never be stored in the database.
+
+Passwords will be stored using a dedicated password-hashing algorithm such as BCrypt or Argon2.
+
+### 12.4 Token-Based Authentication
+
+JWT access tokens are used to authenticate subsequent API requests.
+
+After successful authentication:
+
+1. The User Service validates the user's credentials.
+2. The User Service issues a signed access token.
+3. The frontend sends the token with protected API requests.
+4. The API Gateway validates the token.
+5. The receiving backend service applies its authorization rules.
+
+Protected API requests use the standard Authorization header:
+
+    Authorization: Bearer <access-token>
+
+JWT tokens must be validated for signature, expiration, and applicable issuer and audience requirements.
+
+Sensitive information such as passwords, API secrets, and private credentials must never be included in JWT payloads.
+
+The access-token lifetime, refresh-token strategy, and frontend token-storage approach will be finalized during implementation.
+
+### 12.5 Role-Based Access Control
+
+AquaOps AI uses Role-Based Access Control (RBAC) to manage user permissions.
+
+Initial roles:
+
+| Role | Responsibilities |
+|---|---|
+| ADMIN | Manage users, roles, sensors, and system configuration |
+| MANAGER | Monitor operations, assign incidents, and review operational performance |
+| OPERATOR | Monitor assigned incidents and perform permitted incident actions |
+
+Authorization decisions must be enforced by backend services.
+
+The frontend may hide unavailable actions to improve usability, but frontend restrictions must never be considered a security boundary.
+
+### 12.6 API Gateway Security
+
+The API Gateway acts as the main entry point for frontend API requests.
+
+Its security responsibilities include:
+
+- Validating authentication tokens.
+- Rejecting requests with invalid or expired tokens.
+- Applying appropriate request-level security controls.
+- Routing authorized requests to backend services.
+- Propagating authenticated identity information through trusted mechanisms.
+- Supporting rate limiting where appropriate.
+
+The API Gateway does not replace authorization checks inside backend services.
+
+### 12.7 Backend Service Authorization
+
+Each backend service is responsible for protecting its own business operations.
+
+Examples:
+
+- User Service controls user and role management.
+- Sensor Service controls sensor registration and sensor-related operations.
+- Incident Service verifies permissions before incident assignment, acknowledgement, or resolution.
+- Notification Service protects notification operations and delivery records.
+- AI Service verifies whether the requesting user is allowed to access the requested incident and its associated context.
+
+Services must not assume that a request is authorized merely because it originated from another internal service.
+
+### 12.8 Service-to-Service Security
+
+Internal communication between backend services must be authenticated.
+
+The initial implementation will use a controlled service-to-service authentication mechanism.
+
+Service credentials must be stored securely and must not be committed to Git.
+
+Future deployment improvements may include stronger workload identity and mutual TLS where justified by operational requirements.
+
+### 12.9 Sensor Authentication and Trust
+
+Sensors are external data producers and must not be treated as automatically trusted.
+
+The Sensor Service must verify that incoming telemetry originates from a registered and authorized sensor.
+
+Initial security measures include:
+
+- Unique credentials for registered sensors.
+- Credential validation during telemetry submission.
+- Secure credential storage.
+- Credential rotation and revocation support.
+- Validation that a sensor is permitted to submit data.
+
+Invalid or unauthorized telemetry submissions must be rejected and appropriately logged.
+
+### 12.10 AI Security and Data Access
+
+The AI Service must operate within the authorization boundaries of the main application.
+
+Security requirements include:
+
+- Verify the requesting user's identity.
+- Verify permission to access the requested incident.
+- Retrieve only the incident and telemetry context that the user is authorized to access.
+- Avoid exposing credentials or unrelated sensitive information to the LLM provider.
+- Treat retrieved documents and external content as untrusted input.
+- Validate AI responses before returning them to the user.
+
+The AI Service must not independently grant permissions or bypass the authorization rules of the Incident Service.
+
+AI-generated recommendations remain advisory and cannot directly modify authoritative incident status.
+
+### 12.11 Secrets and Configuration Management
+
+Sensitive configuration must not be hardcoded into application source code.
+
+Examples include:
+
+- Database passwords.
+- JWT signing secrets or private keys.
+- Kafka credentials.
+- Redis credentials.
+- Sensor credentials.
+- LLM provider API keys.
+
+During local development, secrets will be supplied through local environment configuration that is excluded from Git.
+
+In production, managed secret storage will be used where supported by the deployment environment.
+
+Secret rotation must be considered for credentials that can be compromised or expire.
+
+### 12.12 Transport and Data Protection
+
+Communication containing credentials, tokens, or sensitive application data must use HTTPS/TLS in deployed environments.
+
+Additional protections include:
+
+- Secure password hashing.
+- Restricted database access.
+- Appropriate access controls for infrastructure components.
+- Avoiding sensitive information in application logs.
+- Protecting backups and stored data.
+- Restricting access to operational and audit records.
+
+### 12.13 Security Logging and Auditing
+
+Important security-related events should be recorded.
+
+Examples include:
+
+- Successful and failed login attempts.
+- Token validation failures.
+- Unauthorized access attempts.
+- User and role changes.
+- Sensor credential failures.
+- Sensitive incident operations.
+- Administrative configuration changes.
+
+Logs must not contain plain-text passwords, access tokens, signing secrets, or other sensitive credentials.
+
+### 12.14 Security Responsibilities
+
+| Component | Security responsibility |
+|---|---|
+| React Frontend | Send authentication tokens securely and present permitted actions |
+| API Gateway | Validate tokens and apply gateway-level security controls |
+| User Service | Authenticate users and manage user roles |
+| Sensor Service | Validate registered sensor identities |
+| Incident Service | Enforce incident-level authorization |
+| Notification Service | Protect notification operations and records |
+| AI Service | Enforce authorized context retrieval and protect sensitive AI inputs |
+| Infrastructure | Protect databases, Kafka, Redis, secrets, and network communication |
+
+### 12.15 Security Design Principles
+
+The security architecture follows these rules:
+
+1. Authentication and authorization are separate responsibilities.
+2. Backend services enforce business authorization.
+3. The API Gateway is not the only security boundary.
+4. Passwords are never stored in plain text.
+5. Secrets are never committed to source control.
+6. Sensors must be authenticated before submitting trusted telemetry.
+7. AI must not bypass application authorization.
+8. Sensitive credentials must not appear in logs.
+9. Internal service communication must be authenticated.
+10. Security controls must be tested as part of application development.
+
+### 12.16 Future Security Enhancements
+
+Potential future enhancements include:
+
+- Multi-factor authentication.
+- Mutual TLS for internal service communication.
+- More granular permissions and organization-level access isolation.
+- Advanced sensor identity management.
+- Centralized audit and security monitoring.
+- Automated vulnerability scanning.
+- Secret rotation automation.
+- Advanced API rate limiting and abuse detection.
+
+These enhancements will be evaluated according to project requirements and deployment needs.
+
+### 12.17 Architecture Status
+
+Status: Initial security architecture documented.
+
+Implementation of authentication, JWT validation, RBAC, sensor authentication, and service-to-service security will be completed during backend development.
