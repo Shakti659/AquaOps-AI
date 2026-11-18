@@ -1283,3 +1283,82 @@ Status: Initial architecture trade-offs documented.
 The detailed decisions are recorded in the Architecture Decision Records under `docs/decisions/`.
 
 Some decisions, particularly the need for MongoDB and the exact caching strategy, remain subject to implementation and workload validation.
+
+
+## 14. Final Architecture Review
+
+### 14.1 Review Purpose
+
+This section records the final review of the initial AquaOps AI architecture before detailed database design and implementation.
+
+The review checks whether the documented components, communication patterns, data ownership, business workflows, security responsibilities, and failure-handling principles are consistent.
+
+### 14.2 Architecture Review Areas
+
+The architecture review covers:
+
+- Business service responsibilities and boundaries.
+- API Gateway responsibilities.
+- REST and Kafka communication patterns.
+- PostgreSQL, MongoDB, Redis, and Kafka data responsibilities.
+- Telemetry-to-incident workflow.
+- Operator-to-AI investigation workflow.
+- Authentication and authorization.
+- Service-to-service and sensor authentication.
+- Failure handling and recovery.
+- Architecture trade-offs and Architecture Decision Records.
+
+### 14.3 Confirmed Architecture Principles
+
+The initial architecture follows these principles:
+
+1. Five business services and one API Gateway form the initial backend structure.
+2. REST handles synchronous request/response communication.
+3. Kafka handles asynchronous event distribution.
+4. PostgreSQL remains authoritative for transactional business records.
+5. MongoDB remains conditional on telemetry workload validation.
+6. Redis is an optional, rebuildable caching layer.
+7. Incident detection uses deterministic rules.
+8. AI provides advisory investigation assistance.
+9. Backend services enforce business authorization.
+10. Cross-service workflows account for eventual consistency and failure scenarios.
+11. Services own their authoritative business data.
+12. Infrastructure and service complexity must remain appropriate to project requirements.
+
+### 14.4 Items to Validate During Implementation
+
+The following details require practical implementation and testing:
+
+- Exact database schemas and service-specific database arrangements.
+- Whether MongoDB is necessary for telemetry.
+- Kafka topic configuration, partition strategy, and retention.
+- Reliable event publication and idempotent consumption.
+- Cache keys, TTL values, and invalidation rules.
+- JWT lifecycle and refresh-token strategy.
+- Service-to-service authentication.
+- Sensor credential management.
+- Performance, resource usage, and deployment configuration.
+- AI context retrieval, response validation, and provider failure handling.
+
+These details must not be treated as fully implemented or performance-validated merely because they are documented.
+
+### 14.5 Architecture Decision Records
+
+The initial architecture decisions are recorded in:
+
+| ADR | Decision |
+|---|---|
+| ADR-001 | Project architecture |
+| ADR-002 | Database choice |
+| ADR-003 | Kafka choice |
+| ADR-004 | Redis choice |
+
+The decisions will be reviewed when implementation evidence or changing requirements justify revisions.
+
+### 14.6 Review Outcome
+
+The initial architecture documentation and its major technology decisions have been reviewed for consistency.
+
+Status: Initial architecture review completed, subject to implementation validation.
+
+The next project phase is detailed database design, followed by incremental implementation and testing.
